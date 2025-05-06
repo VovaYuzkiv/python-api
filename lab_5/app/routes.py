@@ -4,16 +4,16 @@ from app.database import book_collection
 from bson import ObjectId
 from bson.errors import InvalidId
 
-books = APIRouter()
+book = APIRouter()
 
-@books.get("/")
+@book.get("/")
 async def get_books():
-    books = []
+    bool_list = []
     async for book in book_collection.find():
-        books.append(book_helper(book))
-    return {"books": books}
+        bool_list.append(book_helper(book))
+    return {"books": bool_list}
 
-@books.get("/{book_id}")
+@book.get("/{book_id}")
 async def get_books(book_id: str):
     try:
         obj_id = ObjectId(book_id)
@@ -25,7 +25,7 @@ async def get_books(book_id: str):
     else:
         raise HTTPException(status_code=404, detail="Book not found")
     
-@books.delete("/{book_id}/delete_book")
+@book.delete("/{book_id}/")
 async def delet_book(book_id: str):
     try:
         obj_id = ObjectId(book_id)
@@ -36,7 +36,7 @@ async def delet_book(book_id: str):
         return {"message": "Book deleted"}
     raise HTTPException(status_code=404, detail="Book not found")
 
-@books.post("/create_book")
+@book.post("/")
 async def create_book(book: BookCreate):
     new_book = book.dict()
     result = await book_collection.insert_one(new_book)
