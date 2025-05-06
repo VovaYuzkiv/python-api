@@ -4,27 +4,41 @@ from .models import BookShema, Book
 from app import db
 
 book_schema = BookShema()
-main = Blueprint("lab_3", __name__)
+book = Blueprint("lab_3", __name__)
 
-@main.route("/books", methods=["GET"])
-def get_books():
+@book.route("/books_list", methods=["GET"])
+def get_books_list():
     page = request.args.get("page", 1, type=int)
     per_page = request.args.get("per_page", 5, type=int)
+    total = db.session.query(db.func.count(Book.id)).scalar()
+    total_pages = (total + per_page - 1) // per_page
     stmt = db.select(Book).order_by(Book.id).limit(per_page).offset((page-1) * per_page)
     books = db.session.scalars(stmt).all()
     books_list=[{"id": book.id, "book_name":book.book_name, "author":book.author} for book in books]
-    return jsonify(books_list), 200
+    return jsonify({
+        "books":books_list
+        ,"page": page
+        ,"per_page": per_page
+        ,"total_books":total
+        ,"total_pages":total_pages
+    }), 200
 
-@main.route("/books/<int:book_id>", methods=["GET"])
+@book.route("/books_list/<int:book_id>", methods=["GET"])
 def get_book(book_id):
     book = Book.query.get_or_404(book_id)
-    book_json = [{"id": book.id, "book_name":book.book_name, "author":book.author}]
     if book is not None:
-        return jsonify(book_json),200
+        return {"id": book.id, "book_name": book.book_name, "author": book.author}, 200
     else:
         abort(404)
 
-@main.route("/create_book", methods=["POST"])
+@book.route("books_list/<int:book_id>", methods=["DELETE"])
+def delete_book(book_id):
+    book = Book.query.get_or_404(book_id)
+    db.session.delete(book)
+    db.session.commit()
+    return jsonify({"message":"Book successful deleted"}),200
+
+@book.route("/books_list", methods=["POST"])
 def create_book():
     data = request.get_json()
     if not data:
@@ -32,23 +46,19 @@ def create_book():
     try:
         validated_data = book_schema.load(data)
         new_book = Book(
-                        book_name=validated_data["book_name"], 
-                        author=validated_data["author"]
-                        )
+            book_name=validated_data["book_name"], 
+            author=validated_data["author"]
+        )
         db.session.add(new_book)
         db.session.commit()
-        return jsonify({"message": "Book created successfully", "book": {"id": new_book.id, "book_name": new_book.book_name, "author": new_book.author}}), 201
+        return jsonify({
+            "message": "Book created successfully", 
+            "New book": {
+                "id": new_book.id, 
+                "book_name": new_book.book_name, 
+                "author": new_book.author
+            }
+        }), 201
     except ValidationError as e:
         return jsonify({"error": e.messages}), 400
-
-@main.route("/delete_book/<int:book_id>", methods=["DELETE"])
-def delete_book(book_id):
-    book = Book.query.get_or_404(book_id)
-    db.session.delete(book)
-    db.session.commit()
-    return jsonify({"message":"Book successful deleted"}),200
-
-@main.errorhandler(404)
-def page_not_found(error):
-    return jsonify({"error":"out of range"}),404
     
